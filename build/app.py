@@ -316,7 +316,14 @@ if train_button:
                     'Porcentaje': [f"{v/class_counts.sum()*100:.1f}%" for v in class_counts.values]
                 }),
                 hide_index=True,
-            width='stretch'
+                width='stretch'
+            )
+        
+        with col2:
+            fig, ax = plt.subplots(figsize=(8, 4))
+            bars = ax.bar(['No Desertó (0)', 'Desertó (1)'], class_counts.values, 
+                         color=['#2ecc71', '#e74c3c'], edgecolor='black', alpha=0.7)
+            ax.set_ylabel("Cantidad de estudiantes", fontsize=10)
             ax.set_title("Distribución de Deserción", fontsize=12, fontweight='bold')
             ax.grid(axis='y', alpha=0.3)
             
