@@ -1,11 +1,16 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Backend no interactivo para Streamlit
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
 import pickle
 import os
+from pathlib import Path
+import warnings
+warnings.filterwarnings('ignore')
 
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
@@ -143,8 +148,7 @@ def train_models(X_train, y_train, preprocessor, progress_bar=None):
                 ('classifier', LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced'))
             ]),
             "params": {
-                'classifier__C': [0.01, 0.1, 1, 10],
-                'classifier__penalty': ['l2']
+                'classifier__C': [0.01, 0.1, 1, 10]
             }
         },
         {
@@ -163,10 +167,10 @@ def train_models(X_train, y_train, preprocessor, progress_bar=None):
             "pipeline": Pipeline(steps=[
                 ('preprocessor', preprocessor),
                 ('classifier', xgb.XGBClassifier(
-                    random_state=42, 
-                    use_label_encoder=False, 
+                    random_state=42,
                     eval_metric='logloss',
-                    scale_pos_weight=ratio_desbalance
+                    scale_pos_weight=ratio_desbalance,
+                    verbosity=0
                 ))
             ]),
             "params": {
@@ -239,7 +243,7 @@ st.sidebar.title("⚙️ Configuración")
 # Selector de archivo
 data_file = st.sidebar.text_input(
     "Ruta del archivo CSV",
-    value="../Tbl_DesercionEstudiantil_PrimerAnio_2015_2019.csv"
+    value="Tbl_DesercionEstudiantil_PrimerAnio_2015_2019.csv"
 )
 
 max_samples = st.sidebar.slider(
@@ -312,14 +316,7 @@ if train_button:
                     'Porcentaje': [f"{v/class_counts.sum()*100:.1f}%" for v in class_counts.values]
                 }),
                 hide_index=True,
-                use_container_width=True
-            )
-        
-        with col2:
-            fig, ax = plt.subplots(figsize=(8, 4))
-            bars = ax.bar(['No Desertó (0)', 'Desertó (1)'], class_counts.values, 
-                         color=['#2ecc71', '#e74c3c'], edgecolor='black', alpha=0.7)
-            ax.set_ylabel("Cantidad de estudiantes", fontsize=10)
+            width='stretch'
             ax.set_title("Distribución de Deserción", fontsize=12, fontweight='bold')
             ax.grid(axis='y', alpha=0.3)
             
@@ -402,7 +399,7 @@ if train_button:
                 color='lightblue'
             ),
             hide_index=True,
-            use_container_width=True
+            width='stretch'
         )
         
         # Gráficos comparativos
@@ -530,7 +527,7 @@ if train_button:
         report = classification_report(y_test, model_preds['y_pred'], 
                                       target_names=['No Desertó', 'Desertó'],
                                       output_dict=True)
-        st.dataframe(pd.DataFrame(report).transpose(), use_container_width=True)
+        st.dataframe(pd.DataFrame(report).transpose(), width='stretch')
         
         # Feature Importance (solo para XGBoost)
         if selected_model == "XGBoost":
@@ -561,7 +558,7 @@ if train_button:
                             'Feature': importances.index,
                             'Importancia': importances.values
                         }).reset_index(drop=True),
-                        use_container_width=True,
+                        width='stretch',
                         height=400
                     )
             except Exception as e:
