@@ -6,13 +6,12 @@ matplotlib.use('Agg')  # Backend no interactivo para Streamlit
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
-import pickle
 import os
 from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -29,8 +28,8 @@ import xgboost as xgb
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Dashboard - Predicción de Deserción Estudiantil",
-    page_icon="🎓",
+    page_title="Dashboard - Prediccion de Desercion Estudiantil",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -62,8 +61,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Título principal
-st.markdown('<div class="main-header">🎓 Dashboard - Predicción de Deserción Estudiantil</div>', unsafe_allow_html=True)
-st.markdown("### Comparación de Modelos de Machine Learning")
+st.markdown('<div class="main-header">Dashboard - Prediccion de Desercion Estudiantil</div>', unsafe_allow_html=True)
+st.markdown("### Comparacion de Modelos de Machine Learning")
 st.markdown("---")
 
 # Cache para funciones pesadas
@@ -106,11 +105,23 @@ def identify_features(df, target_col="Deserto"):
     categorical_cols = [c for c in low_cardinality_cols if df[c].dtype == 'object' or df[c].dtype == 'int64']
     
     forced_categorical = ["InstitucionBach", "Carrera", "Plan", "IdCampus", "Sexo"]
+    forced_numeric = ["MateriasInscritas_C1", "MateriasAprobadas_C1", "MateriasReprobadas_C1", 
+                     "MateriasInscritas_C2", "MateriasAprobadas_C2", "MateriasReprobadas_C2", 
+                     "TotalMateriasInscritas_Anio1", "TotalMateriasAprobadas_Anio1", "TotalMateriasReprobadas_Anio1"]
+    
     for col in forced_categorical:
         if col in df.columns and col not in categorical_cols:
             categorical_cols.append(col)
     
+    for col in forced_numeric:
+        if col in categorical_cols:
+            categorical_cols.remove(col)
+    
     numeric_cols = [c for c in df.columns if c not in categorical_cols + [target_col]]
+    
+    for col in forced_numeric:
+        if col in df.columns and col not in numeric_cols:
+            numeric_cols.append(col)
     
     return numeric_cols, categorical_cols
 
@@ -142,13 +153,14 @@ def train_models(X_train, y_train, preprocessor, progress_bar=None):
     
     models_config = [
         {
-            "name": "Regresión Logística",
+            "name": "Regresion Logistica",
             "pipeline": Pipeline(steps=[
                 ('preprocessor', preprocessor),
                 ('classifier', LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced'))
             ]),
             "params": {
-                'classifier__C': [0.01, 0.1, 1, 10]
+                'classifier__C': [0.01, 0.1, 1, 10],
+                'classifier__penalty': ['l2']
             }
         },
         {
@@ -168,6 +180,7 @@ def train_models(X_train, y_train, preprocessor, progress_bar=None):
                 ('preprocessor', preprocessor),
                 ('classifier', xgb.XGBClassifier(
                     random_state=42,
+                    use_label_encoder=False,
                     eval_metric='logloss',
                     scale_pos_weight=ratio_desbalance,
                     verbosity=0
@@ -238,25 +251,25 @@ def evaluate_model(model, X_test, y_test):
     return metrics, y_pred, y_proba
 
 # Sidebar - Configuración
-st.sidebar.title("⚙️ Configuración")
+st.sidebar.title("Configuracion")
 
 # Selector de archivo
-data_file = st.sidebar.text_input(
-    "Ruta del archivo CSV",
-    value="Tbl_DesercionEstudiantil_PrimerAnio_2015_2019.csv"
-)
+data_file_options = {
+    "Dataset Principal (2015-2019)": "Tbl_DesercionEstudiantil_PrimerAnio_2015_2019.csv",
+    "Dataset Completo": "Tbl_DesercionEstudiantil_PrimerAnio_.csv"
+}
 
-max_samples = st.sidebar.slider(
-    "Máximo de muestras",
+selected_dataset = st.sidebar.selectbox(
+    "Saximo de muestras",
     min_value=1000,
     max_value=50000,
     value=10000,
     step=1000,
-    help="Número máximo de registros a procesar"
+    help="Numero maximo de registros a procesar"
 )
 
 test_size = st.sidebar.slider(
-    "Tamaño del conjunto de prueba (%)",
+    "Tamano del conjunto de prueba (%)",
     min_value=10,
     max_value=40,
     value=20,
@@ -265,6 +278,13 @@ test_size = st.sidebar.slider(
 )
 
 # Botón para entrenar modelos
+train_button = st.sidebar.button("Entrenar Modelos", type="primary", use_container_width=True)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Sobre este Dashboard")
+st.sidebar.info(
+    "Este dashboard compara tres modelos de clasificacion para predecir "
+    "la desercion estudiantil en el primer año acade")
 train_button = st.sidebar.button("🚀 Entrenar Modelos", type="primary", use_container_width=True)
 
 st.sidebar.markdown("---")
@@ -281,7 +301,7 @@ if train_button:
         with st.spinner("Cargando datos..."):
             df = load_data(data_file, max_samples)
         
-        st.success(f"✅ Datos cargados: {df.shape[0]} registros, {df.shape[1]} columnas")
+        st.success(f"Datos cargados: {df.shape[0]} registros, {df.shape[1]} columnas")
         
         # Mostrar información del dataset
         col1, col2, col3, col4 = st.columns(4)
@@ -303,7 +323,7 @@ if train_button:
         st.markdown("---")
         
         # Distribución de clases
-        st.markdown('<div class="sub-header">📊 Distribución de la Variable Objetivo</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Distribucion de la Variable Objetivo</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([1, 2])
         
@@ -324,7 +344,7 @@ if train_button:
             bars = ax.bar(['No Desertó (0)', 'Desertó (1)'], class_counts.values, 
                          color=['#2ecc71', '#e74c3c'], edgecolor='black', alpha=0.7)
             ax.set_ylabel("Cantidad de estudiantes", fontsize=10)
-            ax.set_title("Distribución de Deserción", fontsize=12, fontweight='bold')
+            ax.set_title("Distribucion de Desercion", fontsize=12, fontweight='bold')
             ax.grid(axis='y', alpha=0.3)
             
             for i, (bar, val) in enumerate(zip(bars, class_counts.values)):
@@ -354,10 +374,10 @@ if train_button:
             
             preprocessor = create_preprocessor(numeric_cols, categorical_cols)
         
-        st.success(f"✅ Features identificados: {len(numeric_cols)} numéricos, {len(categorical_cols)} categóricos")
+        st.success(f"Features identificados: {len(numeric_cols)} numericos, {len(categorical_cols)} categoricos")
         
         # Entrenar modelos
-        st.markdown('<div class="sub-header">🤖 Entrenamiento de Modelos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Entrenamiento de Modelos</div>', unsafe_allow_html=True)
         
         progress_bar = st.progress(0, text="Iniciando entrenamiento...")
         
@@ -365,12 +385,12 @@ if train_button:
             trained_models, cv_results = train_models(X_train, y_train, preprocessor, progress_bar)
         
         progress_bar.empty()
-        st.success("✅ Todos los modelos entrenados exitosamente!")
+        st.success("Todos los modelos entrenados exitosamente!")
         
         st.markdown("---")
         
         # Evaluación en Test
-        st.markdown('<div class="sub-header">📈 Resultados en Conjunto de Prueba</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Resultados en Conjunto de Prueba</div>', unsafe_allow_html=True)
         
         test_results = []
         all_predictions = {}
@@ -410,7 +430,7 @@ if train_button:
         )
         
         # Gráficos comparativos
-        st.markdown("### 📊 Comparación Visual de Métricas")
+        st.markdown("### Comparacion Visual de Metricas")
         
         col1, col2 = st.columns(2)
         
@@ -428,7 +448,7 @@ if train_button:
             
             ax.set_xlabel('Modelos', fontsize=11)
             ax.set_ylabel('Score', fontsize=11)
-            ax.set_title('Comparación de Métricas de Clasificación', fontsize=12, fontweight='bold')
+            ax.set_title('Comparacion de Metricas de Clasificacion', fontsize=12, fontweight='bold')
             ax.set_xticks(x)
             ax.set_xticklabels(df_test_results['Modelo'], rotation=15, ha='right')
             ax.legend(loc='lower right')
@@ -466,7 +486,7 @@ if train_button:
         st.markdown("---")
         
         # Análisis detallado por modelo
-        st.markdown('<div class="sub-header">🔍 Análisis Detallado por Modelo</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Analisis Detallado por Modelo</div>', unsafe_allow_html=True)
         
         selected_model = st.selectbox(
             "Selecciona un modelo para análisis detallado:",
@@ -481,11 +501,11 @@ if train_button:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Hiperparámetros Óptimos")
+            st.markdown("#### Hiperparametros Optimos")
             st.json(model_info['best_params'])
         
         with col2:
-            st.markdown("#### Métricas de Rendimiento")
+            st.markdown("#### Metricas de Rendimiento")
             model_metrics = df_test_results[df_test_results['Modelo'] == selected_model].iloc[0]
             
             metric_col1, metric_col2 = st.columns(2)
@@ -500,12 +520,12 @@ if train_button:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Matriz de Confusión")
+            st.markdown("#### Matriz de Confusion")
             fig, ax = plt.subplots(figsize=(8, 6))
             cm = confusion_matrix(y_test, model_preds['y_pred'])
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['No Desertó', 'Desertó'])
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['No Deserto', 'Deserto'])
             disp.plot(ax=ax, cmap='Blues', values_format='d')
-            ax.set_title(f'Matriz de Confusión - {selected_model}', fontweight='bold')
+            ax.set_title(f'Matriz de Confusion - {selected_model}', fontweight='bold')
             st.pyplot(fig)
             plt.close()
         
@@ -530,16 +550,16 @@ if train_button:
             plt.close()
         
         # Reporte de clasificación
-        st.markdown("#### Reporte de Clasificación")
+        st.markdown("#### Reporte de Clasificacion")
         report = classification_report(y_test, model_preds['y_pred'], 
-                                      target_names=['No Desertó', 'Desertó'],
+                                      target_names=['No Deserto', 'Deserto'],
                                       output_dict=True)
         st.dataframe(pd.DataFrame(report).transpose(), width='stretch')
         
         # Feature Importance (solo para XGBoost)
         if selected_model == "XGBoost":
             st.markdown("---")
-            st.markdown("#### 🎯 Feature Importance")
+            st.markdown("#### Feature Importance")
             
             try:
                 clf = model_info['model'].named_steps.get('classifier')
@@ -574,7 +594,7 @@ if train_button:
         st.markdown("---")
         
         # Conclusiones
-        st.markdown('<div class="sub-header">💡 Conclusiones</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Conclusiones</div>', unsafe_allow_html=True)
         
         best_model_name = df_test_results.iloc[0]['Modelo']
         best_f1 = df_test_results.iloc[0]['F1-Score']
@@ -585,60 +605,60 @@ if train_button:
         **Modelo Recomendado: {best_model_name}**
         
         - El modelo {best_model_name} obtuvo el mejor F1-Score ({best_f1:.4f}) en el conjunto de prueba.
-        - Recall de {best_recall:.4f} indica que detecta {best_recall*100:.1f}% de los casos de deserción.
+        - Recall de {best_recall:.4f} indica que detecta {best_recall*100:.1f}% de los casos de desercion.
         - Precision de {best_precision:.4f} significa que {best_precision*100:.1f}% de las predicciones positivas son correctas.
-        - Este modelo balancea adecuadamente la detección de estudiantes en riesgo con la precisión de las alertas.
+        - Este modelo balancea adecuadamente la deteccion de estudiantes en riesgo con la precision de las alertas.
         """)
         
         st.info("""
-        **Consideraciones para la Implementación:**
+        **Consideraciones para la Implementacion:**
         
-        1. **Monitoreo Continuo**: El rendimiento del modelo debe monitorearse regularmente ante cambios en la población estudiantil.
-        2. **Ajuste de Umbral**: El umbral de decisión (0.5 por defecto) puede ajustarse según el costo relativo de falsos positivos vs. falsos negativos.
-        3. **Actualización Periódica**: Re-entrenar el modelo con datos nuevos para mantener su precisión.
-        4. **Intervención Temprana**: Usar las predicciones para implementar programas de retención focalizados.
+        1. **Monitoreo Continuo**: El rendimiento del modelo debe monitorearse regularmente ante cambios en la poblacion estudiantil.
+        2. **Ajuste de Umbral**: El umbral de decision (0.5 por defecto) puede ajustarse segun el costo relativo de falsos positivos vs. falsos negativos.
+        3. **Actualizacion Periodica**: Re-entrenar el modelo con datos nuevos para mantener su precision.
+        4. **Intervencion Temprana**: Usar las predicciones para implementar programas de retencion focalizados.
         """)
         
     except FileNotFoundError:
-        st.error(f"❌ No se encontró el archivo: {data_file}")
+        st.error(f"No se encontro el archivo: {data_file}")
         st.info("Por favor, verifica la ruta del archivo en la barra lateral.")
     except Exception as e:
-        st.error(f"❌ Error durante el procesamiento: {str(e)}")
+        st.error(f"Error durante el procesamiento: {str(e)}")
         st.exception(e)
 
 else:
     # Pantalla inicial
-    st.info("👈 Configura los parámetros en la barra lateral y presiona **'Entrenar Modelos'** para comenzar.")
+    st.info("Configura los parametros en la barra lateral y presiona 'Entrenar Modelos' para comenzar.")
     
     st.markdown("""
-    ### 📋 Instrucciones de Uso
+    ### Instrucciones de Uso
     
-    1. **Configurar Ruta del Archivo**: En la barra lateral, ingresa la ruta al archivo CSV con los datos.
-    2. **Ajustar Parámetros**: Define el número máximo de muestras y el tamaño del conjunto de prueba.
-    3. **Entrenar Modelos**: Presiona el botón para iniciar el entrenamiento y comparación de modelos.
-    4. **Analizar Resultados**: Explora las métricas, gráficos y análisis detallados de cada modelo.
+    1. **Seleccionar Dataset**: En la barra lateral, elige entre el dataset principal (2015-2019) o el completo.
+    2. **Ajustar Parametros**: Define el numero maximo de muestras y el tamano del conjunto de prueba.
+    3. **Entrenar Modelos**: Presiona el boton para iniciar el entrenamiento y comparacion de modelos.
+    4. **Analizar Resultados**: Explora las metricas, graficos y analisis detallados de cada modelo.
     
-    ### 🎯 Modelos Incluidos
+    ### Modelos Incluidos
     
-    - **Regresión Logística**: Modelo baseline, interpretable y rápido
+    - **Regresion Logistica**: Modelo baseline, interpretable y rapido
     - **K-Nearest Neighbors**: Modelo basado en similitud
     - **XGBoost**: Modelo de ensamble con gradient boosting
     
-    ### 📊 Métricas Evaluadas
+    ### Metricas Evaluadas
     
-    - **F1-Score**: Balance entre precisión y recall
+    - **F1-Score**: Balance entre precision y recall
     - **Recall**: Capacidad de detectar casos positivos
     - **Precision**: Exactitud de las predicciones positivas
-    - **Accuracy**: Precisión general del modelo
-    - **ROC-AUC**: Área bajo la curva ROC
-    - **PR-AUC**: Área bajo la curva Precision-Recall
+    - **Accuracy**: Precision general del modelo
+    - **ROC-AUC**: Area bajo la curva ROC
+    - **PR-AUC**: Area bajo la curva Precision-Recall
     """)
 
 # Footer
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray; font-size: 0.9rem;'>"
-    "Dashboard de Predicción de Deserción Estudiantil | Machine Learning Supervisado | 2026"
+    "Dashboard de Prediccion de Desercion Estudiantil | Machine Learning Supervisado | 2026"
     "</div>",
     unsafe_allow_html=True
 )
