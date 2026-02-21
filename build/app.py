@@ -260,7 +260,14 @@ data_file_options = {
 }
 
 selected_dataset = st.sidebar.selectbox(
-    "Saximo de muestras",
+    "Seleccionar Dataset",
+    options=list(data_file_options.keys())
+)
+
+data_file = data_file_options[selected_dataset]
+
+max_samples = st.sidebar.slider(
+    "Maximo de muestras",
     min_value=1000,
     max_value=50000,
     value=10000,
