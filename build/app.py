@@ -291,14 +291,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### Sobre este Dashboard")
 st.sidebar.info(
     "Este dashboard compara tres modelos de clasificacion para predecir "
-    "la desercion estudiantil en el primer año acade")
-train_button = st.sidebar.button("🚀 Entrenar Modelos", type="primary", use_container_width=True)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Sobre este Dashboard")
-st.sidebar.info(
-    "Este dashboard compara tres modelos de clasificación para predecir "
-    "la deserción estudiantil en el primer año académico."
+    "la desercion estudiantil en el primer año academico."
 )
 
 # Main content
@@ -423,215 +416,230 @@ if train_button:
         
         df_test_results = pd.DataFrame(test_results).sort_values('F1-Score', ascending=False)
         
-        # Tabla de resultados
-        st.dataframe(
-            df_test_results.style.highlight_max(
-                subset=['F1-Score', 'Recall', 'Precision', 'Accuracy', 'ROC-AUC', 'PR-AUC'],
-                color='lightgreen'
-            ).highlight_min(
-                subset=['Tiempo (s)'],
-                color='lightblue'
-            ),
-            hide_index=True,
-            width='stretch'
-        )
-        
-        # Gráficos comparativos
-        st.markdown("### Comparacion Visual de Metricas")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Gráfico de barras - Métricas principales
-            fig, ax = plt.subplots(figsize=(10, 6))
-            metrics_to_plot = ['F1-Score', 'Recall', 'Precision', 'Accuracy']
-            x = np.arange(len(df_test_results))
-            width = 0.2
-            
-            for i, metric in enumerate(metrics_to_plot):
-                offset = width * (i - 1.5)
-                ax.bar(x + offset, df_test_results[metric], width, 
-                      label=metric, alpha=0.8, edgecolor='black')
-            
-            ax.set_xlabel('Modelos', fontsize=11)
-            ax.set_ylabel('Score', fontsize=11)
-            ax.set_title('Comparacion de Metricas de Clasificacion', fontsize=12, fontweight='bold')
-            ax.set_xticks(x)
-            ax.set_xticklabels(df_test_results['Modelo'], rotation=15, ha='right')
-            ax.legend(loc='lower right')
-            ax.set_ylim(0, 1.1)
-            ax.grid(axis='y', alpha=0.3)
-            
-            st.pyplot(fig)
-            plt.close()
-        
-        with col2:
-            # Scatter plot - Precision vs Recall
-            fig, ax = plt.subplots(figsize=(10, 6))
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
-            
-            for i, row in df_test_results.iterrows():
-                ax.scatter(row['Recall'], row['Precision'], 
-                          s=300, alpha=0.6, edgecolor='black',
-                          color=colors[i % len(colors)],
-                          label=row['Modelo'])
-                ax.annotate(row['Modelo'], 
-                           (row['Recall'], row['Precision']),
-                           fontsize=9, ha='center', va='bottom')
-            
-            ax.set_xlabel('Recall (Sensibilidad)', fontsize=11)
-            ax.set_ylabel('Precision', fontsize=11)
-            ax.set_title('Trade-off Precision vs Recall', fontsize=12, fontweight='bold')
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, 1)
-            ax.grid(alpha=0.3)
-            ax.legend(loc='lower left')
-            
-            st.pyplot(fig)
-            plt.close()
-        
-        st.markdown("---")
-        
-        # Análisis detallado por modelo
-        st.markdown('<div class="sub-header">Analisis Detallado por Modelo</div>', unsafe_allow_html=True)
-        
-        selected_model = st.selectbox(
-            "Selecciona un modelo para análisis detallado:",
-            options=list(trained_models.keys()),
-            index=0
-        )
-        
-        model_info = trained_models[selected_model]
-        model_preds = all_predictions[selected_model]
-        
-        # Información del modelo
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Hiperparametros Optimos")
-            st.json(model_info['best_params'])
-        
-        with col2:
-            st.markdown("#### Metricas de Rendimiento")
-            model_metrics = df_test_results[df_test_results['Modelo'] == selected_model].iloc[0]
-            
-            metric_col1, metric_col2 = st.columns(2)
-            with metric_col1:
-                st.metric("F1-Score", f"{model_metrics['F1-Score']:.4f}")
-                st.metric("Recall", f"{model_metrics['Recall']:.4f}")
-            with metric_col2:
-                st.metric("Precision", f"{model_metrics['Precision']:.4f}")
-                st.metric("Accuracy", f"{model_metrics['Accuracy']:.4f}")
-        
-        # Matriz de confusión y curvas
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Matriz de Confusion")
-            fig, ax = plt.subplots(figsize=(8, 6))
-            cm = confusion_matrix(y_test, model_preds['y_pred'])
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['No Deserto', 'Deserto'])
-            disp.plot(ax=ax, cmap='Blues', values_format='d')
-            ax.set_title(f'Matriz de Confusion - {selected_model}', fontweight='bold')
-            st.pyplot(fig)
-            plt.close()
-        
-        with col2:
-            if model_preds['y_proba'] is not None:
-                st.markdown("#### Curva ROC")
-                fig, ax = plt.subplots(figsize=(8, 6))
-                RocCurveDisplay.from_predictions(y_test, model_preds['y_proba'], ax=ax)
-                ax.set_title(f'Curva ROC - {selected_model}', fontweight='bold')
-                ax.grid(alpha=0.3)
-                st.pyplot(fig)
-                plt.close()
-        
-        # Curva Precision-Recall
-        if model_preds['y_proba'] is not None:
-            st.markdown("#### Curva Precision-Recall")
-            fig, ax = plt.subplots(figsize=(10, 5))
-            PrecisionRecallDisplay.from_predictions(y_test, model_preds['y_proba'], ax=ax)
-            ax.set_title(f'Curva Precision-Recall - {selected_model}', fontweight='bold')
-            ax.grid(alpha=0.3)
-            st.pyplot(fig)
-            plt.close()
-        
-        # Reporte de clasificación
-        st.markdown("#### Reporte de Clasificacion")
-        report = classification_report(y_test, model_preds['y_pred'], 
-                                      target_names=['No Deserto', 'Deserto'],
-                                      output_dict=True)
-        st.dataframe(pd.DataFrame(report).transpose(), width='stretch')
-        
-        # Feature Importance (solo para XGBoost)
-        if selected_model == "XGBoost":
-            st.markdown("---")
-            st.markdown("#### Feature Importance")
-            
-            try:
-                clf = model_info['model'].named_steps.get('classifier')
-                pre = model_info['model'].named_steps.get('preprocessor')
-                
-                if hasattr(clf, 'feature_importances_') and pre is not None:
-                    feat_names = pre.get_feature_names_out()
-                    importances = pd.Series(clf.feature_importances_, index=feat_names)
-                    importances = importances.sort_values(ascending=False).head(20)
-                    
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    importances.sort_values().plot(kind='barh', ax=ax, color='steelblue', 
-                                                   edgecolor='black', alpha=0.7)
-                    ax.set_xlabel('Importancia', fontsize=11)
-                    ax.set_title('Top 20 Features Más Importantes', fontsize=12, fontweight='bold')
-                    ax.grid(axis='x', alpha=0.3)
-                    st.pyplot(fig)
-                    plt.close()
-                    
-                    # Tabla de importancias
-                    st.dataframe(
-                        pd.DataFrame({
-                            'Feature': importances.index,
-                            'Importancia': importances.values
-                        }).reset_index(drop=True),
-                        width='stretch',
-                        height=400
-                    )
-            except Exception as e:
-                st.warning(f"No se pudo extraer feature importance: {str(e)}")
-        
-        st.markdown("---")
-        
-        # Conclusiones
-        st.markdown('<div class="sub-header">Conclusiones</div>', unsafe_allow_html=True)
-        
-        best_model_name = df_test_results.iloc[0]['Modelo']
-        best_f1 = df_test_results.iloc[0]['F1-Score']
-        best_recall = df_test_results.iloc[0]['Recall']
-        best_precision = df_test_results.iloc[0]['Precision']
-        
-        st.success(f"""
-        **Modelo Recomendado: {best_model_name}**
-        
-        - El modelo {best_model_name} obtuvo el mejor F1-Score ({best_f1:.4f}) en el conjunto de prueba.
-        - Recall de {best_recall:.4f} indica que detecta {best_recall*100:.1f}% de los casos de desercion.
-        - Precision de {best_precision:.4f} significa que {best_precision*100:.1f}% de las predicciones positivas son correctas.
-        - Este modelo balancea adecuadamente la deteccion de estudiantes en riesgo con la precision de las alertas.
-        """)
-        
-        st.info("""
-        **Consideraciones para la Implementacion:**
-        
-        1. **Monitoreo Continuo**: El rendimiento del modelo debe monitorearse regularmente ante cambios en la poblacion estudiantil.
-        2. **Ajuste de Umbral**: El umbral de decision (0.5 por defecto) puede ajustarse segun el costo relativo de falsos positivos vs. falsos negativos.
-        3. **Actualizacion Periodica**: Re-entrenar el modelo con datos nuevos para mantener su precision.
-        4. **Intervencion Temprana**: Usar las predicciones para implementar programas de retencion focalizados.
-        """)
-        
+        # Guardar en session_state
+        st.session_state['trained_models'] = trained_models
+        st.session_state['all_predictions'] = all_predictions
+        st.session_state['df_test_results'] = df_test_results
+        st.session_state['y_test'] = y_test
+        st.session_state['training_completed'] = True
+    
     except FileNotFoundError:
         st.error(f"No se encontro el archivo: {data_file}")
         st.info("Por favor, verifica la ruta del archivo en la barra lateral.")
     except Exception as e:
         st.error(f"Error durante el procesamiento: {str(e)}")
         st.exception(e)
+
+# Mostrar resultados si ya se entrenaron modelos
+if st.session_state.get('training_completed', False):
+    trained_models = st.session_state['trained_models']
+    all_predictions = st.session_state['all_predictions']
+    df_test_results = st.session_state['df_test_results']
+    y_test = st.session_state['y_test']
+    
+    # Tabla de resultados
+    st.dataframe(
+        df_test_results.style.highlight_max(
+            subset=['F1-Score', 'Recall', 'Precision', 'Accuracy', 'ROC-AUC', 'PR-AUC'],
+            color='lightgreen'
+        ).highlight_min(
+            subset=['Tiempo (s)'],
+            color='lightblue'
+        ),
+        hide_index=True,
+        width='stretch'
+    )
+    
+    # Gráficos comparativos
+    st.markdown("### Comparacion Visual de Metricas")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de barras - Métricas principales
+        fig, ax = plt.subplots(figsize=(10, 6))
+        metrics_to_plot = ['F1-Score', 'Recall', 'Precision', 'Accuracy']
+        x = np.arange(len(df_test_results))
+        width = 0.2
+        
+        for i, metric in enumerate(metrics_to_plot):
+            offset = width * (i - 1.5)
+            ax.bar(x + offset, df_test_results[metric], width, 
+                  label=metric, alpha=0.8, edgecolor='black')
+        
+        ax.set_xlabel('Modelos', fontsize=11)
+        ax.set_ylabel('Score', fontsize=11)
+        ax.set_title('Comparacion de Metricas de Clasificacion', fontsize=12, fontweight='bold')
+        ax.set_xticks(x)
+        ax.set_xticklabels(df_test_results['Modelo'], rotation=15, ha='right')
+        ax.legend(loc='lower right')
+        ax.set_ylim(0, 1.1)
+        ax.grid(axis='y', alpha=0.3)
+        
+        st.pyplot(fig)
+        plt.close()
+    
+    with col2:
+        # Scatter plot - Precision vs Recall
+        fig, ax = plt.subplots(figsize=(10, 6))
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+        
+        for i, row in df_test_results.iterrows():
+            ax.scatter(row['Recall'], row['Precision'], 
+                      s=300, alpha=0.6, edgecolor='black',
+                      color=colors[i % len(colors)],
+                      label=row['Modelo'])
+            ax.annotate(row['Modelo'], 
+                       (row['Recall'], row['Precision']),
+                       fontsize=9, ha='center', va='bottom')
+        
+        ax.set_xlabel('Recall (Sensibilidad)', fontsize=11)
+        ax.set_ylabel('Precision', fontsize=11)
+        ax.set_title('Trade-off Precision vs Recall', fontsize=12, fontweight='bold')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.grid(alpha=0.3)
+        ax.legend(loc='lower left')
+        
+        st.pyplot(fig)
+        plt.close()
+    
+    st.markdown("---")
+    
+    # Análisis detallado por modelo
+    st.markdown('<div class="sub-header">Analisis Detallado por Modelo</div>', unsafe_allow_html=True)
+    
+    selected_model = st.selectbox(
+        "Selecciona un modelo para análisis detallado:",
+        options=list(trained_models.keys()),
+        index=0,
+        key='model_selector'
+    )
+    
+    model_info = trained_models[selected_model]
+    model_preds = all_predictions[selected_model]
+    
+    # Información del modelo
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Hiperparametros Optimos")
+        st.json(model_info['best_params'])
+    
+    with col2:
+        st.markdown("#### Metricas de Rendimiento")
+        model_metrics = df_test_results[df_test_results['Modelo'] == selected_model].iloc[0]
+        
+        metric_col1, metric_col2 = st.columns(2)
+        with metric_col1:
+            st.metric("F1-Score", f"{model_metrics['F1-Score']:.4f}")
+            st.metric("Recall", f"{model_metrics['Recall']:.4f}")
+        with metric_col2:
+            st.metric("Precision", f"{model_metrics['Precision']:.4f}")
+            st.metric("Accuracy", f"{model_metrics['Accuracy']:.4f}")
+    
+    # Matriz de confusión y curvas
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Matriz de Confusion")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        cm = confusion_matrix(y_test, model_preds['y_pred'])
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['No Deserto', 'Deserto'])
+        disp.plot(ax=ax, cmap='Blues', values_format='d')
+        ax.set_title(f'Matriz de Confusion - {selected_model}', fontweight='bold')
+        st.pyplot(fig)
+        plt.close()
+    
+    with col2:
+        if model_preds['y_proba'] is not None:
+            st.markdown("#### Curva ROC")
+            fig, ax = plt.subplots(figsize=(8, 6))
+            RocCurveDisplay.from_predictions(y_test, model_preds['y_proba'], ax=ax)
+            ax.set_title(f'Curva ROC - {selected_model}', fontweight='bold')
+            ax.grid(alpha=0.3)
+            st.pyplot(fig)
+            plt.close()
+    
+    # Curva Precision-Recall
+    if model_preds['y_proba'] is not None:
+        st.markdown("#### Curva Precision-Recall")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        PrecisionRecallDisplay.from_predictions(y_test, model_preds['y_proba'], ax=ax)
+        ax.set_title(f'Curva Precision-Recall - {selected_model}', fontweight='bold')
+        ax.grid(alpha=0.3)
+        st.pyplot(fig)
+        plt.close()
+    
+    # Reporte de clasificación
+    st.markdown("#### Reporte de Clasificacion")
+    report = classification_report(y_test, model_preds['y_pred'], 
+                                  target_names=['No Deserto', 'Deserto'],
+                                  output_dict=True)
+    st.dataframe(pd.DataFrame(report).transpose(), width='stretch')
+    
+    # Feature Importance (solo para XGBoost)
+    if selected_model == "XGBoost":
+        st.markdown("---")
+        st.markdown("#### Feature Importance")
+        
+        try:
+            clf = model_info['model'].named_steps.get('classifier')
+            pre = model_info['model'].named_steps.get('preprocessor')
+            
+            if hasattr(clf, 'feature_importances_') and pre is not None:
+                feat_names = pre.get_feature_names_out()
+                importances = pd.Series(clf.feature_importances_, index=feat_names)
+                importances = importances.sort_values(ascending=False).head(20)
+                
+                fig, ax = plt.subplots(figsize=(10, 8))
+                importances.sort_values().plot(kind='barh', ax=ax, color='steelblue', 
+                                               edgecolor='black', alpha=0.7)
+                ax.set_xlabel('Importancia', fontsize=11)
+                ax.set_title('Top 20 Features Mas Importantes', fontsize=12, fontweight='bold')
+                ax.grid(axis='x', alpha=0.3)
+                st.pyplot(fig)
+                plt.close()
+                
+                # Tabla de importancias
+                st.dataframe(
+                    pd.DataFrame({
+                        'Feature': importances.index,
+                        'Importancia': importances.values
+                    }).reset_index(drop=True),
+                    width='stretch',
+                    height=400
+                )
+        except Exception as e:
+            st.warning(f"No se pudo extraer feature importance: {str(e)}")
+    
+    st.markdown("---")
+    
+    # Conclusiones
+    st.markdown('<div class="sub-header">Conclusiones</div>', unsafe_allow_html=True)
+    
+    best_model_name = df_test_results.iloc[0]['Modelo']
+    best_f1 = df_test_results.iloc[0]['F1-Score']
+    best_recall = df_test_results.iloc[0]['Recall']
+    best_precision = df_test_results.iloc[0]['Precision']
+    
+    st.success(f"""
+    **Modelo Recomendado: {best_model_name}**
+    
+    - El modelo {best_model_name} obtuvo el mejor F1-Score ({best_f1:.4f}) en el conjunto de prueba.
+    - Recall de {best_recall:.4f} indica que detecta {best_recall*100:.1f}% de los casos de desercion.
+    - Precision de {best_precision:.4f} significa que {best_precision*100:.1f}% de las predicciones positivas son correctas.
+    - Este modelo balancea adecuadamente la deteccion de estudiantes en riesgo con la precision de las alertas.
+    """)
+    
+    st.info("""
+    **Consideraciones para la Implementacion:**
+    
+    1. **Monitoreo Continuo**: El rendimiento del modelo debe monitorearse regularmente ante cambios en la poblacion estudiantil.
+    2. **Ajuste de Umbral**: El umbral de decision (0.5 por defecto) puede ajustarse segun el costo relativo de falsos positivos vs. falsos negativos.
+    3. **Actualizacion Periodica**: Re-entrenar el modelo con datos nuevos para mantener su precision.
+    4. **Intervencion Temprana**: Usar las predicciones para implementar programas de retencion focalizados.
+    """)
 
 else:
     # Pantalla inicial
