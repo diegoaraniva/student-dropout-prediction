@@ -269,8 +269,8 @@ data_file = data_file_options[selected_dataset]
 max_samples = st.sidebar.slider(
     "Maximo de muestras",
     min_value=1000,
-    max_value=50000,
-    value=10000,
+    max_value=5000,
+    value=5000,
     step=1000,
     help="Numero maximo de registros a procesar"
 )
