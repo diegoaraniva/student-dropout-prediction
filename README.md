@@ -36,7 +36,9 @@ Dashboard interactivo desarrollado con Streamlit para predecir la desercion estu
 pip install -r requirements.txt
 ```
 
-## Ejecucion Local
+## Ejecucion
+
+### 1. Dashboard de comparacion de modelos
 
 Desde el directorio raiz del proyecto (no desde build/), ejecuta:
 
@@ -55,13 +57,36 @@ El dashboard se abrira automaticamente en tu navegador en `http://localhost:8501
 3. Presiona "Entrenar Modelos"
 4. Explora los resultados y analisis detallados
 
+### 2. Interfaz de inferencia (prediccion individual)
+
+Desde el directorio raiz del proyecto (no desde build/), ejecuta:
+
+1. Primero entrena el modelo para generar los archivos `.pkl`:
+
+```bash
+python build/train_model.py
+```
+
+2. Luego ejecuta la interfaz donde puedes ingresar los datos de un estudiante y obtener la prediccion:
+
+```bash
+streamlit run build/interfaz_inferencia_app.py
+```
+
+3. Accede en tu navegador en `http://localhost:8501`
+
 ## Estructura del Proyecto
 
 ```
-build/
-├── app.py                  # Aplicacion principal de Streamlit
-├── requirements.txt        # Dependencias de Python
-└── README.md              # Este archivo
+├── Proyecto_Grupo6.ipynb                              # Notebook con analisis completo (EDA + modelado)
+├── Tbl_DesercionEstudiantil_PrimerAnio_.csv            # Dataset principal
+├── Tbl_DesercionEstudiantil_PrimerAnio_2015_2019.csv   # Dataset filtrado 2015-2019
+├── README.md
+└── build/
+    ├── app.py                      # Dashboard de comparacion de modelos (Streamlit)
+    ├── interfaz_inferencia_app.py  # Interfaz de prediccion individual (Streamlit)
+    ├── train_model.py              # Script de entrenamiento del modelo
+    └── requirements.txt            # Dependencias de Python
 ```
 
 ## Notas Importantes
@@ -70,4 +95,3 @@ build/
 - Se recomienda usar el dataset principal (2015-2019) para pruebas rapidas
 - Los modelos se entrenan cada vez que presionas el boton (no hay cache de modelos)
 - Asegurate de tener suficiente memoria RAM para datasets grandes
-
